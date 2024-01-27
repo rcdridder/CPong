@@ -5,7 +5,7 @@
 #define FPS 60
 #define PADDLE_HEIGHT 100
 #define PADDLE_WIDTH 20
-#define PUCK_SPEED 6
+#define PUCK_SPEED 4.5
 #define PADDLE_SPEED 6
 #define FONT_SIZE 36
 
@@ -82,7 +82,7 @@ void draw_field(int *score1, int *score2)
 
 void puck_update(struct puck *puck, int *score1, int *score2)
 {
-    if (puck->p.y < puck->r / 2 || puck->p.y > W_HEIGHT - puck->r / 2)
+    if (puck->p.y < puck->r || puck->p.y > W_HEIGHT - puck->r)
         puck->sp_y = -(puck->sp_y);
 
     if (puck->p.x < 0) {
@@ -126,8 +126,12 @@ void paddle_move(struct Rectangle *pad, float speed)
 
 void check_collisions(struct puck *puck, struct Rectangle *pad1, struct Rectangle *pad2)
 {
-    if (CheckCollisionCircleRec(puck->p, puck->r, *pad1) && puck->p.x < pad1->x + PADDLE_WIDTH * 2)
+    if (CheckCollisionCircleRec(puck->p, puck->r, *pad1)) {
         puck->sp_x = -(puck->sp_x);
-    if (CheckCollisionCircleRec(puck->p, puck->r, *pad2) && puck->p.x > pad2->x - PADDLE_WIDTH * 2)
+        puck->p.x = pad1->x + PADDLE_WIDTH + (puck->sp_x * 2);
+    }
+    if (CheckCollisionCircleRec(puck->p, puck->r, *pad2)) {
         puck->sp_x = -(puck->sp_x);
+        puck->p.x = pad2->x + (puck->sp_x * 2);
+    }
 }
