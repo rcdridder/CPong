@@ -122,6 +122,10 @@ int main(void)
                     current_screen = GAMEPLAY;
                     paddle1.r.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2);
                     paddle2.r.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2);
+                    paddle1.top.y = paddle1.r.y;
+                    paddle1.bottom.y = paddle1.r.y + PADDLE_HEIGHT;
+                    paddle2.top.y = paddle2.r.y;
+                    paddle2.bottom.y = paddle2.r.y + PADDLE_HEIGHT;
                     PlaySound(start_sound);
                 }
             } break;
@@ -220,7 +224,7 @@ void check_collisions(struct puck *puck, struct paddle *pad1, struct paddle *pad
     if (puck->left.x <= pad1->top.x && 
         puck->left.y > pad1->top.y &&
         puck->left.y < pad1->bottom.y) {
-            for (int i = 0, p_seg = 80; i < 7; i++, p_seg +=80) {
+            for (int i = 0, p_seg = PADDLE_SEG; i < 7; i++, p_seg += PADDLE_SEG) {
                 segments[i] = pad1->top.y + p_seg;
             }
 
