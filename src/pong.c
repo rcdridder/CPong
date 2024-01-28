@@ -7,6 +7,8 @@
 #define PADDLE_WIDTH 20
 #define PUCK_SPEED 6
 #define PADDLE_SPEED 6
+#define P1_COLOUR RED
+#define P2_COLOUR BLUE
 
 struct puck { 
     Vector2 p;
@@ -124,8 +126,8 @@ int main(void)
             {
                 draw_field(&score1, &score2);
                 DrawCircleV(puck.p, puck.r, WHITE);
-                DrawRectangle(paddle1.x, paddle1.y, paddle1.width, paddle1.height, RED);
-                DrawRectangle(paddle2.x, paddle2.y, paddle2.width, paddle2.height, BLUE);
+                DrawRectangle(paddle1.x, paddle1.y, paddle1.width, paddle1.height, P1_COLOUR);
+                DrawRectangle(paddle2.x, paddle2.y, paddle2.width, paddle2.height, P2_COLOUR);
             } break;
             default: break;
         }
@@ -219,8 +221,8 @@ void paddle_move(struct Rectangle *pad, float speed)
 
 void draw_field(int *score1, int *score2)
 {
-    DrawText(TextFormat("%d", *score1), PADDLE_WIDTH * 3, PADDLE_WIDTH, 36, RED);
-    DrawText(TextFormat("%d", *score2), W_WIDTH - PADDLE_WIDTH * 3, PADDLE_WIDTH, 36, BLUE);
+    DrawText(TextFormat("%d", *score1), PADDLE_WIDTH * 3, PADDLE_WIDTH, 36, P1_COLOUR);
+    DrawText(TextFormat("%d", *score2), W_WIDTH - PADDLE_WIDTH * 3, PADDLE_WIDTH, 36, P2_COLOUR);
     DrawLine(W_WIDTH / 2, 0, W_WIDTH / 2, W_HEIGHT, WHITE);
     DrawCircleLines(W_WIDTH / 2, W_HEIGHT / 2, 150, WHITE);
 }
