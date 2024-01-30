@@ -1,92 +1,73 @@
-#include "raylib.h"
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+#include "pong.h"
 
 #define W_WIDTH 1280
 #define W_HEIGHT 720
 #define FPS 60
+
+#define PUCK_RADIUS 10
+#define PUCK_SPEED 6
+
 #define PADDLE_HEIGHT 120
 #define PADDLE_WIDTH 20
-#define PUCK_SPEED 6
 #define PADDLE_SPEED 6
+
 #define P1_COLOUR RED
 #define P2_COLOUR BLUE
 
-struct puck { 
-    Vector2 p;
-    float r;
-    float sp_x;
-    float sp_y;
-};
-
-enum gamescreen { ROUND_START, GAMEPLAY };
-
-/* Updates score and returns true if it's a goal. */
-bool puck_goal(struct puck *puck, Sound *score_sound, int *score1, int *score2);
-
-/* Resets the puck and choose a serve direction */
-void puck_reset(struct puck *puck);
-
-/* Updates puck position. */
-void puck_update(struct puck *puck, Sound *wall_sound);
-
-/* Checks if the puck touches a paddle, if so changes the puck's direction. */
-void check_collisions(struct puck *puck, struct Rectangle *pad1, struct Rectangle *pad2, Sound *paddle_sound);
-
-/* Gets user input and calls paddle_move to move the paddle. */
-void paddles_update(struct Rectangle *pad1, struct Rectangle *pad2);
-
-/* Moves the paddle in the given direction. */
-void paddle_move(struct Rectangle *pad, float speed);
-
-/* Draws the playing field with scores. */
-void draw_field(int *score1, int *score2);
-
 int main(void)
 {
+    /* Global variables */
     enum gamescreen current_screen = ROUND_START;
+
+    /* ROUND_START variables */
     char round_start_msg[] = "Press enter to start a new round";
-    
-    float start_angle = 0;
-    while(!start_angle)
-        start_angle = GetRandomValue(-2, 2);
+
+    /* GAMEPLAY variables */
+    srand(time(NULL));
 
     struct puck puck = {
-        .p.x = W_WIDTH / 2,
-        .p.y = W_HEIGHT / 2,
-        .r = 10.0,
-        .sp_x = PUCK_SPEED,
-        .sp_y = (float)GetRandomValue(-2, 2)
+        .radius = PUCK_RADIUS,
+        .pos.x = W_WIDTH / 2,
+        .pos.y = W_HEIGHT / 2,
+        .vel.x = PUCK_SPEED * cos(puck_serve_angle()),
+        .vel.y = PUCK_SPEED * sin(puck_serve_angle()),
     };
 
-    struct Rectangle paddle1 = {
-        .height = PADDLE_HEIGHT,
-        .width = PADDLE_WIDTH,
-        .x = PADDLE_WIDTH,
-        .y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2),
+    struct paddle pad1 = {
+        .top.x = PADDLE_WIDTH * 2,
+        .top.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2),
+        .bottom.x = PADDLE_WIDTH * 2,
+        .bottom.y = (W_HEIGHT / 2) + (PADDLE_HEIGHT / 2)
     };
 
-    struct Rectangle paddle2 = {
-        .height = PADDLE_HEIGHT,
-        .width = PADDLE_WIDTH,
-        .x = W_WIDTH - (PADDLE_WIDTH * 2),
-        .y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2),
+    struct paddle pad2 = {
+        .top.x = W_WIDTH - (PADDLE_WIDTH * 2),
+        .top.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2),
+        .bottom.x = W_WIDTH - (PADDLE_WIDTH * 2),
+        .bottom.y = (W_HEIGHT / 2) + (PADDLE_HEIGHT / 2)
     };
 
-    int score1 = 0, score2 = 0;
+    int p1_score = 0, p2_score = 0;
 
-    char start_loc[] = "./resources/start.wav";
-    char paddle_loc[] = "./resources/hit.wav";
-    char goal_loc[] = "./resources/goal.wav";
-    char wall_loc[] = "./resources/wall.wav";
+    bool wall_coll;
+    float pad_coll, puck_speed;
 
+    /* Initialization */
     SetTargetFPS(FPS);
     InitWindow(W_WIDTH, W_HEIGHT, "Pong");
-    
     InitAudioDevice();
-    Sound start_sound = LoadSound(start_loc);
-    Sound paddle_sound = LoadSound(paddle_loc); 
-    Sound score_sound = LoadSound(goal_loc);
-    Sound wall_sound = LoadSound(wall_loc);
 
+    Sound sounds[] = {
+        LoadSound("./resources/start.wav"),
+        LoadSound("./resources/hit.wav"),
+        LoadSound("./resources/goal.wav"),
+        LoadSound("./resources/wall.wav")
+    };
+
+    /* Gameloop */
     while(!WindowShouldClose()) {
         //Update
         switch (current_screen) {
@@ -94,111 +75,73 @@ int main(void)
             {
                 if (IsKeyPressed(KEY_ENTER)) {
                     current_screen = GAMEPLAY;
-                    paddle1.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2);
-                    paddle2.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2);
-                    PlaySound(start_sound);
+                    puck_speed = PUCK_SPEED;
+                    puck_reset(&puck);
+                    paddle_reset(&pad1);
+                    paddle_reset(&pad2);
+                    PlaySound(sounds[0]);
                 }
             } break;
             case GAMEPLAY:
             {
-                if (puck_goal(&puck, &score_sound, &score1, &score2)) {
-                    puck_reset(&puck);
+                if(puck_goal(&puck, &sounds[2], &p1_score, &p2_score))
                     current_screen = ROUND_START;
-                }
-                check_collisions(&puck, &paddle1, &paddle2, &paddle_sound);
-                puck_update(&puck, &wall_sound);
-                paddles_update(&paddle1, &paddle2);
+                wall_coll = puck_wall_coll(&puck);
+                pad_coll = puck_pad_coll(&puck, &pad1, &pad2);
+                puck_update(&puck, wall_coll, pad_coll, &puck_speed, &sounds[3], &sounds[1]);
+                paddles_update(&pad1, &pad2);
             } break;
             default: break;
         }
         //Draw
         BeginDrawing();
-        
-        ClearBackground(BLACK);
-        switch (current_screen) {
-            case ROUND_START:
-            {
-                draw_field(&score1, &score2);
-                DrawRectangle(W_WIDTH * 0.25, W_HEIGHT * 0.25, W_WIDTH * 0.5, W_HEIGHT * 0.5, WHITE);
-                DrawText(round_start_msg, W_WIDTH * 0.275, W_HEIGHT * 0.5, 33, BLACK);
-            } break;
-            case GAMEPLAY:
-            {
-                draw_field(&score1, &score2);
-                DrawCircleV(puck.p, puck.r, WHITE);
-                DrawRectangle(paddle1.x, paddle1.y, paddle1.width, paddle1.height, P1_COLOUR);
-                DrawRectangle(paddle2.x, paddle2.y, paddle2.width, paddle2.height, P2_COLOUR);
-            } break;
-            default: break;
-        }
-
+            ClearBackground(BLACK);
+            switch (current_screen) {
+                case ROUND_START:
+                {
+                    draw_field(&p1_score, &p2_score);
+                    DrawRectangle(W_WIDTH * 0.25, W_HEIGHT * 0.25, W_WIDTH * 0.5, W_HEIGHT * 0.5, WHITE);
+                    DrawText(round_start_msg, W_WIDTH * 0.275, W_HEIGHT * 0.5, 33, BLACK);
+                } break;
+                case GAMEPLAY:
+                {
+                    draw_field(&p1_score, &p2_score);
+                    DrawCircleV(puck.pos, puck.radius, WHITE);
+                    DrawRectangle(pad1.top.x - PADDLE_WIDTH, pad1.top.y, PADDLE_WIDTH, PADDLE_HEIGHT, P1_COLOUR);
+                    DrawRectangle(pad2.top.x, pad2.top.y, PADDLE_WIDTH, PADDLE_HEIGHT, P2_COLOUR);
+                } break;
+                default: break;
+            }
         EndDrawing();
     }
 
+    /* Breakdown*/
     CloseAudioDevice();
     CloseWindow();
     return 0;
 }
 
-bool puck_goal(struct puck *puck, Sound *score_sound, int *score1, int *score2)
+void paddle_move(struct paddle *pad, float speed)
 {
-     if (puck->p.x < 0) {
-        PlaySound(*score_sound);
-        *score2 += 1;
-        return true;
-    } 
-    if (puck->p.x > W_WIDTH) {
-        PlaySound(*score_sound);
-        *score1 += 1;
-        return true;
+    pad->top.y += speed;
+    pad->bottom.y += speed;
+    if (pad->top.y <= 0) {
+        pad->top.y = 0;
+        pad->bottom.y = pad->top.y + PADDLE_HEIGHT;
     }
-    return false;
-}
-
-void puck_reset(struct puck *puck)
-{
-    float angle = 0;
-    int dir = GetRandomValue(0, 1);
-
-    while(!angle)
-        angle = GetRandomValue(-2, 2);
-
-    puck->p.x = W_WIDTH / 2;
-    puck->p.y = W_HEIGHT / 2;
-    if (dir == 1)
-        puck->sp_x = PUCK_SPEED;
-    else
-        puck->sp_x = -PUCK_SPEED;
-    puck->sp_y = angle;
-}
-
-void puck_update(struct puck *puck, Sound *wall_sound)
-{
-    if (puck->p.y < puck->r || puck->p.y > W_HEIGHT - puck->r) {
-        PlaySound(*wall_sound);
-        puck->sp_y = -(puck->sp_y);
-    }
-    puck->p.x += puck->sp_x;
-    puck->p.y += puck->sp_y;
-}
-
-void check_collisions(struct puck *puck, struct Rectangle *pad1, struct Rectangle *pad2, Sound *paddle_sound)
-{
-    if (CheckCollisionCircleRec(puck->p, puck->r, *pad1)) {
-        puck->sp_x = -(puck->sp_x * 1.05);
-        puck->p.x = pad1->x + PADDLE_WIDTH + (puck->sp_x * 2);
-        puck->sp_y *= 1.1;
-        PlaySound(*paddle_sound);
-    }
-    if (CheckCollisionCircleRec(puck->p, puck->r, *pad2)) {
-        puck->sp_x = -(puck->sp_x * 1.1);
-        puck->p.x = pad2->x + (puck->sp_x * 2);
-        puck->sp_y *= 1.1;
-        PlaySound(*paddle_sound);
+    if (pad->bottom.y >= W_HEIGHT) {
+        pad->bottom.y = W_HEIGHT;
+        pad->top.y = pad->bottom.y - PADDLE_HEIGHT;
     }
 }
 
-void paddles_update(struct Rectangle *pad1, struct Rectangle *pad2)
+void paddle_reset(struct paddle *pad)
+{
+    pad->top.y = (W_HEIGHT / 2) - (PADDLE_HEIGHT / 2);
+    pad->bottom.y = (W_HEIGHT / 2) + (PADDLE_HEIGHT / 2);
+}
+
+void paddles_update(struct paddle *pad1, struct paddle *pad2)
 {
     if (IsKeyDown('W'))
         paddle_move(pad1, -PADDLE_SPEED);
@@ -210,13 +153,109 @@ void paddles_update(struct Rectangle *pad1, struct Rectangle *pad2)
         paddle_move(pad2, PADDLE_SPEED);
 }
 
-void paddle_move(struct Rectangle *pad, float speed)
+bool puck_goal(struct puck *puck, Sound *goal, int *p1_score, int *p2_score)
 {
-    pad->y += speed;
-    if (pad->y <= 0)
-        pad->y = 0;
-    if (pad->y >= W_HEIGHT - pad->height)
-        pad->y = W_HEIGHT - pad->height;     
+    if (puck->pos.x < 0) {
+        PlaySound(*goal);
+        *p2_score += 1;
+        return true;
+    } else if (puck-> pos.x > W_WIDTH) {
+        PlaySound(*goal);
+        *p1_score += 1;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+float puck_pad_coll(struct puck *puck, struct paddle *pad1, struct paddle *pad2)
+{
+    float puck_y = puck->pos.y;
+    float p1_segement = pad1->top.y;
+    float p2_segment = pad2->top.y;
+
+    //Check pad1
+    if (puck->pos.x - puck->radius <= pad1->top.x && puck_y >= pad1->top.y && puck_y <= pad1->bottom.y)  {
+        if (puck_y < (p1_segement += (PADDLE_HEIGHT / 8)))
+            return -my_pi / 4;
+        else if (puck_y < (p1_segement += (PADDLE_HEIGHT / 8)))
+            return -my_pi / 6;
+        else if (puck_y < (p1_segement += (PADDLE_HEIGHT / 8)))
+            return -my_pi / 12;
+        else if (puck_y < (p1_segement += ((PADDLE_HEIGHT / 8) * 3)))
+            return 2 * my_pi;
+        else if (puck_y < (p1_segement += (PADDLE_HEIGHT / 8)))
+            return  my_pi / 12;
+        else if (puck_y < (p1_segement += (PADDLE_HEIGHT / 8)))
+            return my_pi / 6;
+        else {
+            return my_pi / 4;
+        }
+    } 
+    //Check pad2
+    if (puck->pos.x + puck->radius >= pad2->top.x && puck_y >= pad2->top.y && puck_y <= pad2->bottom.y) {
+        if (puck_y < (p2_segment += (PADDLE_HEIGHT / 8)))
+            return -((3 * my_pi) / 4);
+        else if (puck_y < (p2_segment += (PADDLE_HEIGHT / 8)))
+            return -((5 * my_pi) / 6);
+        else if (puck_y < (p2_segment += (PADDLE_HEIGHT / 8)))
+            return -((11 * my_pi) / 12);
+        else if (puck_y < (p2_segment += ((PADDLE_HEIGHT / 8) * 3)))
+            return my_pi;
+        else if (puck_y < (p2_segment += (PADDLE_HEIGHT / 8)))
+            return (11 * my_pi) / 12;
+        else if (puck_y < (p2_segment += (PADDLE_HEIGHT / 8)))
+            return (5 * my_pi) / 6;
+        else
+            return (3 * my_pi) / 4;
+    }
+
+    return 0;
+}
+
+void puck_reset(struct puck *puck)
+{
+        puck->pos.x = W_WIDTH / 2;
+        puck->pos.y = W_HEIGHT / 2;
+        puck->vel.x = PUCK_SPEED * cos(puck_serve_angle());
+        puck->vel.y = PUCK_SPEED * sin(puck_serve_angle());
+        if (GetRandomValue(0, 1) == 1) {
+            puck->vel.x *= -1;
+            puck->vel.y *= -1;
+        }
+}
+
+float puck_serve_angle(void)
+{
+    return ((float)rand() / ((float) RAND_MAX)) * (((my_pi / 4) - (-my_pi / 4)) + (-my_pi / 4));  
+}
+
+void puck_update(struct puck *puck, bool wall_coll, float pad_coll, float *puck_speed, Sound *wall, Sound *pad)
+{
+    if (wall_coll) {
+        puck->vel.y *= -1;
+        PlaySound(*wall);
+    }
+    if (pad_coll != 0) {
+        *puck_speed *= 1.1;
+        puck->vel.x = (*puck_speed * cos(pad_coll));
+        puck->vel.y = (*puck_speed * sin(pad_coll));
+        PlaySound(*pad);
+    }
+
+    puck->pos.x += puck->vel.x;
+    puck->pos.y += puck->vel.y;
+}
+
+bool puck_wall_coll(struct puck *puck)
+{
+    float puck_top = puck->pos.y - puck->radius;
+    float puck_bottom = puck->pos.y + puck->radius;
+
+    if (puck_top < 0 || puck_bottom > W_HEIGHT)
+        return true;
+    else
+        return false;
 }
 
 void draw_field(int *score1, int *score2)
