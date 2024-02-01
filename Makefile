@@ -6,29 +6,31 @@ RAYLIB_VERSION     = 4.2.0
 RAYLIB_PATH        = C:/raylib/raylib/
 EXT                = .exe
 COMPILER_PATH      = C:/msys64/ucrt64/bin/gcc.exe
+CC                 = gcc
 BUILD_MODE         = DEBUG
+INC_DIR            = ./include
+SRC_DIR            = src
+OBJ_DIR            = obj
 
 export PATH := $(COMPILER_PATH):$(PATH)
 
-CC = gcc
 MAKE = mingw32-make
-CFLAGS += -Wall -pedantic -std=c99 -D_DEFAULT_SOURCE -Wno-missing-braces
 
+CFLAGS += -Wall -pedantic -std=c99 -D_DEFAULT_SOURCE -Wno-missing-braces
 ifeq ($(BUILD_MODE),DEBUG)
     CFLAGS += -g -O0
 else
     CFLAGS += -s -O1
 endif
-
 CFLAGS += $(RAYLIB_PATH)/src/raylib.rc.data -Wl,--subsystem,windows
-INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
+
+INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external -I$(INC_DIR)
+
 LDFLAGS = -L. -L$(RAYLIB_PATH)/src 
+
 LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
-
-SRC_DIR = src
-OBJ_DIR = obj
 
 SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
