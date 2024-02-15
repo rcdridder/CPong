@@ -5,10 +5,10 @@ PROJECT_NAME       = pong
 RAYLIB_VERSION     = 4.2.0
 RAYLIB_PATH        = C:/raylib/raylib/
 EXT                = .exe
-COMPILER_PATH      = C:/msys64/ucrt64/bin/gcc.exe
+COMPILER_PATH      = gcc.exe
 CC                 = gcc
 BUILD_MODE         = DEBUG
-INC_DIR            = ./include
+INC_DIR            = ./headers
 SRC_DIR            = src
 OBJ_DIR            = obj
 
